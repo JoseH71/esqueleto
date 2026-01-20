@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getActiveWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan } from '../utils/weeklyPlanStorage';
+import { getActiveWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan, saveActiveWorkout, subscribeToActiveWorkout } from '../utils/weeklyPlanStorage';
 import { saveWorkout } from '../utils/firestoreStorage';
 import WeeklyPlanCard from './WeeklyPlanCard';
 import './TodayView.css';
@@ -17,6 +17,14 @@ export default function TodayView() {
     useEffect(() => {
         loadActiveWorkout();
         loadWeeklyPlan();
+
+        // Subscribe to Cross-Device Active Workout changes
+        const unsubscribeActive = subscribeToActiveWorkout((workout) => {
+            console.log('Sync: Global active workout updated');
+            setActiveWorkout(workout);
+        });
+
+        return () => unsubscribeActive();
     }, []);
 
     const loadActiveWorkout = () => {
@@ -119,7 +127,8 @@ export default function TodayView() {
             exercises: day.exercises,
             duration_minutes: day.duration_minutes
         };
-        localStorage.setItem('activeWorkout', JSON.stringify(workout));
+        // Global sync
+        saveActiveWorkout(workout);
         setActiveWorkout(workout);
     };
 
@@ -133,7 +142,7 @@ export default function TodayView() {
 
     const clearActiveWorkout = () => {
         if (confirm('¿Limpiar el entrenamiento activo?')) {
-            localStorage.removeItem('activeWorkout');
+            saveActiveWorkout(null);
             setActiveWorkout(null);
         }
     };
@@ -154,7 +163,7 @@ export default function TodayView() {
         updatedWorkout.exercises = updatedExercises;
 
         setActiveWorkout(updatedWorkout);
-        localStorage.setItem('activeWorkout', JSON.stringify(updatedWorkout));
+        saveActiveWorkout(updatedWorkout);
 
         // Global Sync with Weekly Plan
         if (updatedWorkout.planId && updatedWorkout.dayId) {

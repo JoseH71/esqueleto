@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getActiveWeeklyPlan, getWeeklyPlans, deleteWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan } from '../utils/weeklyPlanStorage';
+import { getActiveWeeklyPlan, getWeeklyPlans, deleteWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan, saveActiveWorkout } from '../utils/weeklyPlanStorage';
 import WeeklyPlanCard from './WeeklyPlanCard';
 import './WeeklyPlanView.css';
 
@@ -77,7 +77,7 @@ export default function WeeklyPlanView() {
             exercises: day.exercises,
             duration_minutes: day.duration_minutes
         };
-        localStorage.setItem('activeWorkout', JSON.stringify(workout));
+        saveActiveWorkout(workout);
         window.location.hash = '#today';
         window.dispatchEvent(new CustomEvent('navigateToToday'));
     };

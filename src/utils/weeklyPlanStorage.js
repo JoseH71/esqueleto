@@ -9,6 +9,7 @@ import {
     deleteDoc,
     updateDoc,
     doc,
+    setDoc,
     query,
     orderBy,
     limit,
@@ -197,5 +198,56 @@ export const subscribeToWeeklyPlan = (planId, onUpdate) => {
         }
     }, (error) => {
         console.error("Error listening to plan updates:", error);
+    });
+};
+
+/**
+ * Synchronize the Active Workout across devices via Firestore
+ * @param {Object} workout - The workout to set as active
+ */
+export const saveActiveWorkout = async (workout) => {
+    try {
+        if (!workout) {
+            // If clearing, we can just remove it or set a null state
+            const docRef = doc(db, 'appState', 'activeWorkout');
+            await setDoc(docRef, { workout: null, timestamp: serverTimestamp() });
+            localStorage.removeItem('activeWorkout');
+            return;
+        }
+
+        const docRef = doc(db, 'appState', 'activeWorkout');
+        await setDoc(docRef, {
+            workout,
+            timestamp: serverTimestamp()
+        });
+
+        // Also update local for immediate feedback
+        localStorage.setItem('activeWorkout', JSON.stringify(workout));
+    } catch (error) {
+        console.error('Error syncing active workout:', error);
+    }
+};
+
+/**
+ * Listen for Active Workout changes from other devices
+ * @param {function} onUpdate - Callback when workout changes
+ */
+export const subscribeToActiveWorkout = (onUpdate) => {
+    const docRef = doc(db, 'appState', 'activeWorkout');
+    return onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            if (data.workout) {
+                // Only trigger update if it's different from local to avoid loops
+                const stored = localStorage.getItem('activeWorkout');
+                if (JSON.stringify(data.workout) !== stored) {
+                    localStorage.setItem('activeWorkout', JSON.stringify(data.workout));
+                    onUpdate(data.workout);
+                }
+            } else {
+                localStorage.removeItem('activeWorkout');
+                onUpdate(null);
+            }
+        }
     });
 };

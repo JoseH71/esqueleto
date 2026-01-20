@@ -6,6 +6,7 @@ import HistoryView from './components/HistoryView';
 import WeeklyPlanView from './components/WeeklyPlanView';
 import WeeklyPlanModal from './components/WeeklyPlanModal';
 import { saveWorkout } from './utils/firestoreStorage';
+import { saveActiveWorkout } from './utils/weeklyPlanStorage';
 import './App.css';
 
 /**
@@ -45,8 +46,8 @@ function App() {
       const saved = await saveWorkout(workout);
       console.log('Workout saved:', saved);
 
-      // Save as active workout for "Hoy" tab
-      localStorage.setItem('activeWorkout', JSON.stringify(workout));
+      // Save as active workout for "Hoy" tab (Global sync)
+      await saveActiveWorkout(workout);
 
       const workoutTitle = workout.title || workout.session || 'Entrenamiento';
       setSavedMessage(`✓ "${workoutTitle}" guardado exitosamente`);
