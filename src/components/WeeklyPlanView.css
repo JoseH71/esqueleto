@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.weekly-plan-view {
+    padding: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #ffffff;
+}
+
+/* Header */
+.plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.plan-title-section h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: #ffffff !important;
+}
+
+.week-range {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    /* Keep a bit gray for hierarchy but safe */
+    margin: 0;
+}
+
+.plan-header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.btn-history {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-history:hover {
+    background: #334155;
+}
+
+.btn-delete-plan {
+    background: #450a0a;
+    border: 1px solid #7f1d1d;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-plan:hover {
+    background: #7f1d1d;
+    transform: scale(1.05);
+}
+
+/* Plan History */
+.plan-history {
+    background: #111111;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #333333;
+}
+
+.plan-history h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 0 0 0.75rem 0;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.history-item-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.history-item {
+    flex: 1;
+    background: #1e1e1e;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.history-item:hover {
+    background: #2d2d2d;
+}
+
+.history-item.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.btn-delete-history {
+    background: #450a0a;
+    border: 1px solid #7f1d1d;
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-delete-history:hover {
+    background: #7f1d1d;
+    transform: scale(1.05);
+}
+
+/* Description & Rules */
+.plan-description,
+.plan-rules {
+    background: #111111;
+    border-left: 4px solid #667eea;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #222222;
+}
+
+.description-header,
+.rules-header {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+}
+
+.plan-description p,
+.plan-rules p {
+    margin: 0;
+    color: #ffffff !important;
+    line-height: 1.6;
+    font-size: 0.95rem;
+    white-space: pre-wrap;
+}
+
+/* Days Container */
+.days-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Empty & Loading States */
+.empty-state,
+.loading-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #ffffff;
+}
+
+.empty-icon,
+.loading-spinner {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    color: #cbd5e1;
+    margin: 0.5rem 0;
+}
+
+.empty-hint {
+    color: #94a3b8;
+    font-size: 0.95rem;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .weekly-plan-view {
+        padding: 1rem;
+    }
+
+    .plan-header {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .plan-title-section h1 {
+        font-size: 1.75rem;
+    }
+
+    .week-range {
+        font-size: 1.1rem;
+    }
+}
