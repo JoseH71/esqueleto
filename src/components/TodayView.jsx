@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getActiveWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan } from '../utils/weeklyPlanStorage';
+import { saveWorkout } from '../utils/firestoreStorage';
 import WeeklyPlanCard from './WeeklyPlanCard';
 import './TodayView.css';
 
@@ -11,6 +12,7 @@ export default function TodayView() {
     const [activeWorkout, setActiveWorkout] = useState(null);
     const [weeklyPlan, setWeeklyPlan] = useState(null);
     const [expandedDays, setExpandedDays] = useState({});
+    const [savedMessage, setSavedMessage] = useState('');
 
     useEffect(() => {
         loadActiveWorkout();
@@ -175,6 +177,22 @@ export default function TodayView() {
         }
     };
 
+    const handleSaveToHistory = async () => {
+        try {
+            // Save to Firestore history
+            await saveWorkout(activeWorkout);
+
+            const workoutTitle = getWorkoutTitle(activeWorkout);
+            setSavedMessage(`✅ "${workoutTitle}" guardado en historial`);
+
+            // Auto-dismiss message after 3 seconds
+            setTimeout(() => setSavedMessage(''), 3000);
+        } catch (error) {
+            console.error('Error saving to history:', error);
+            alert('Error al guardar: ' + error.message);
+        }
+    };
+
     if (!activeWorkout) {
         return (
             <div className="today-view">
@@ -192,6 +210,13 @@ export default function TodayView() {
 
     return (
         <div className="today-view">
+            {/* Success Toast */}
+            {savedMessage && (
+                <div className="success-toast">
+                    {savedMessage}
+                </div>
+            )}
+
             <div className="today-header">
                 <div>
                     <h1>💪 Hoy</h1>
@@ -200,13 +225,22 @@ export default function TodayView() {
                         <p className="workout-date">📅 {activeWorkout.date}</p>
                     )}
                 </div>
-                <button
-                    onClick={clearActiveWorkout}
-                    className="btn-clear"
-                    title="Limpiar entrenamiento activo"
-                >
-                    🗑️
-                </button>
+                <div className="header-actions">
+                    <button
+                        onClick={handleSaveToHistory}
+                        className="btn-complete"
+                        title="Guardar en historial"
+                    >
+                        ✅ Entreno Completado
+                    </button>
+                    <button
+                        onClick={clearActiveWorkout}
+                        className="btn-clear"
+                        title="Limpiar entrenamiento activo"
+                    >
+                        🗑️
+                    </button>
+                </div>
             </div>
 
             {/* AI Description/Comments */}

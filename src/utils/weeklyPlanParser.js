@@ -28,7 +28,8 @@ export function parseWeeklyPlan(text) {
         weekRange: '',
         description: '',
         rules: '',
-        days: []
+        days: [],
+        year: null // Store extracted year
     };
 
     let currentSection = null;
@@ -54,7 +55,15 @@ export function parseWeeklyPlan(text) {
                 // Fallback: extract anything after 📅
                 weeklyPlan.weekRange = trimmedLine.replace('📅', '').replace(/SEMANA\s*GYM\s*[·•]?/i, '').trim();
             }
+
+            // Extract year from week range (e.g., "20–26 ENERO 2026")
+            const yearMatch = weeklyPlan.weekRange.match(/\b(20\d{2})\b/);
+            if (yearMatch) {
+                weeklyPlan.year = yearMatch[1];
+            }
+
             console.log('[Parser] Found week range:', weeklyPlan.weekRange);
+            console.log('[Parser] Extracted year:', weeklyPlan.year);
             continue;
         }
 
@@ -65,7 +74,7 @@ export function parseWeeklyPlan(text) {
             // Save previous day if exists
             if (currentDayMeta && currentDayText.length > 0) {
                 console.log('[Parser] Saving previous day:', currentDayMeta.dayName, currentDayMeta.dateStr);
-                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'));
+                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'), weeklyPlan.year);
                 if (parsedDay) {
                     weeklyPlan.days.push(parsedDay);
                     console.log('[Parser] Day saved successfully. Total days:', weeklyPlan.days.length);
@@ -93,7 +102,7 @@ export function parseWeeklyPlan(text) {
             // Save current day first (IMPORTANT: save before switching to description mode)
             if (currentDayMeta && currentDayText.length > 0) {
                 console.log('[Parser] Saving day before description:', currentDayMeta.dayName);
-                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'));
+                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'), weeklyPlan.year);
                 if (parsedDay) {
                     weeklyPlan.days.push(parsedDay);
                     console.log('[Parser] Day saved. Total days:', weeklyPlan.days.length);
@@ -112,7 +121,7 @@ export function parseWeeklyPlan(text) {
             // Save current day if still active
             if (currentDayMeta && currentDayText.length > 0) {
                 console.log('[Parser] Saving day before rules:', currentDayMeta.dayName);
-                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'));
+                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'), weeklyPlan.year);
                 if (parsedDay) {
                     weeklyPlan.days.push(parsedDay);
                     console.log('[Parser] Day saved. Total days:', weeklyPlan.days.length);
@@ -146,7 +155,7 @@ export function parseWeeklyPlan(text) {
     // Save last day (in case it wasn't saved yet)
     if (currentDayMeta && currentDayText.length > 0) {
         console.log('[Parser] Saving last day:', currentDayMeta.dayName);
-        const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'));
+        const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'), weeklyPlan.year);
         if (parsedDay) {
             weeklyPlan.days.push(parsedDay);
             console.log('[Parser] Last day saved. Total days:', weeklyPlan.days.length);
@@ -167,19 +176,22 @@ export function parseWeeklyPlan(text) {
  * Parse a single day from its text content
  * @param {Object} meta - Day metadata (emoji, dayName, dateStr, title)
  * @param {string} text - The day's content text
+ * @param {string} year - Year from the weekly plan header (e.g., "2026")
  * @returns {Object} Parsed day object
  */
-function parseDayFromText(meta, text) {
+function parseDayFromText(meta, text, year) {
     // Use the existing workout parser for the exercises
     const workout = parseWorkoutText(text);
 
-    // Format the date
+    // Format the date with year
     const dateMatch = meta.dateStr.match(/(\d{1,2})[-\/\.](\d{1,2})/);
     let formattedDate = meta.dateStr;
     if (dateMatch) {
         const day = dateMatch[1].padStart(2, '0');
         const month = dateMatch[2].padStart(2, '0');
-        formattedDate = `${day}-${month}`;
+        // Use provided year or fallback to current year
+        const yearStr = year || new Date().getFullYear().toString();
+        formattedDate = `${day}-${month}-${yearStr}`;
     }
 
     return {
