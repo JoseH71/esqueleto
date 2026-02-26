@@ -5,19 +5,44 @@ import TodayView from './components/TodayView';
 import HistoryView from './components/HistoryView';
 import WeeklyPlanView from './components/WeeklyPlanView';
 import WeeklyPlanModal from './components/WeeklyPlanModal';
+import EvolutionView from './components/EvolutionView';
 import { saveWorkout } from './utils/firestoreStorage';
 import { saveActiveWorkout } from './utils/weeklyPlanStorage';
+import { onAuthChange, signInAnonymousUser } from './firebase';
 import './App.css';
 
 /**
  * Main App Component
- * Manages navigation - no auth required for shared storage
+ * Manages navigation and Firebase Authentication
  */
 function App() {
   const [currentView, setCurrentView] = useState('importer');
   const [currentWorkout, setCurrentWorkout] = useState(null);
   const [savedMessage, setSavedMessage] = useState('');
   const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Initialize Firebase Authentication
+  useEffect(() => {
+    const unsubscribe = onAuthChange((u) => {
+      if (u) {
+        console.log('App: User authenticated:', u.uid);
+        setUser(u);
+        setIsAuthLoading(false);
+      } else {
+        console.log('App: No user, signing in anonymously...');
+        signInAnonymousUser()
+          .then(() => setIsAuthLoading(false))
+          .catch(err => {
+            console.error('App: Auth error:', err);
+            setIsAuthLoading(false);
+          });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Listen for navigation events from other components
   useEffect(() => {
@@ -77,6 +102,11 @@ function App() {
     setSavedMessage('');
   };
 
+  const showEvolution = () => {
+    setCurrentView('evolution');
+    setSavedMessage('');
+  };
+
   const showImporter = () => {
     setCurrentView('importer');
     setCurrentWorkout(null);
@@ -87,6 +117,15 @@ function App() {
     setCurrentView('weeklyPlan');
     setSavedMessage('');
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="app-loading">
+        <div className="spinner"></div>
+        <p>Sincronizando con la nube...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -128,6 +167,12 @@ function App() {
           >
             📋 Historial
           </button>
+          <button
+            className={`nav-tab ${currentView === 'evolution' ? 'active' : ''}`}
+            onClick={showEvolution}
+          >
+            📉 Evolución
+          </button>
         </nav>
       )}
 
@@ -164,6 +209,10 @@ function App() {
 
       {currentView === 'history' && (
         <HistoryView />
+      )}
+
+      {currentView === 'evolution' && (
+        <EvolutionView />
       )}
 
       {/* Weekly Plan Modal */}

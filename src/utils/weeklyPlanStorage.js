@@ -35,24 +35,56 @@ const getWeeklyPlansCollection = () => {
 export const saveWeeklyPlan = async (weeklyPlan) => {
     try {
         const plansRef = getWeeklyPlansCollection();
-        const newPlan = {
+
+        const planData = {
             ...weeklyPlan,
-            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
             timestamp: new Date().toISOString(),
         };
-        const docRef = await addDoc(plansRef, newPlan);
+
+        // Always create a new plan document (never overwrite old plans)
+        console.log('[Storage] Creating new plan:', weeklyPlan.weekRange);
+        const dataToSave = { ...planData, createdAt: serverTimestamp() };
+        const docRef = await addDoc(plansRef, dataToSave);
+        const resultPlan = { ...dataToSave, id: docRef.id };
 
         // Also save to localStorage as the active week plan
-        localStorage.setItem('activeWeeklyPlan', JSON.stringify({
-            ...newPlan,
-            id: docRef.id
-        }));
+        localStorage.setItem('activeWeeklyPlan', JSON.stringify(resultPlan));
 
-        return { ...newPlan, id: docRef.id };
+        // Broadast as global active plan
+        await saveActivePlanId(docRef.id);
+
+        return resultPlan;
     } catch (error) {
         console.error('Error saving weekly plan:', error);
         throw error;
     }
+};
+
+/**
+ * Broadcast the currently active plan ID to all devices
+ * @param {string} planId - ID of the plan
+ */
+export const saveActivePlanId = async (planId) => {
+    try {
+        const docRef = doc(db, 'appState', 'activePlanId');
+        await setDoc(docRef, { planId, timestamp: serverTimestamp() });
+    } catch (error) {
+        console.error('Error broadcasting active plan ID:', error);
+    }
+};
+
+/**
+ * Listen for the global active plan ID change
+ * @param {function} onUpdate - Callback with new plan ID
+ */
+export const subscribeToActivePlanId = (onUpdate) => {
+    const docRef = doc(db, 'appState', 'activePlanId');
+    return onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            onUpdate(doc.data().planId);
+        }
+    });
 };
 
 /**

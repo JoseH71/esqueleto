@@ -54,19 +54,74 @@
     flex-direction: column;
 }
 
+/* Completed Check */
+.completed-check {
+    font-size: 1.2rem;
+    margin-left: 0.5rem;
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+    animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: inline-block;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
 .day-name {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #a0aec0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #94a3b8;
     text-transform: uppercase;
-    letter-spacing: 0.7px;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.date-badge.editable {
+    cursor: pointer;
+    color: #3b82f6;
+    /* Azul brillante como en el historial */
+    border: 1px dashed rgba(59, 130, 246, 0.3);
+}
+
+.date-badge.editable:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    transform: scale(1.05);
+}
+
+.hidden-date-picker {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
 }
 
 .day-title {
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: #ffffff !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f1f5f9 !important;
+    text-shadow: none;
 }
 
 .day-actions {
@@ -152,6 +207,29 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.btn-add-ex {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px dashed #333333;
+    border-radius: 8px;
+    padding: 0.8rem;
+    color: #718096;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-add-ex:hover {
+    background: #111111;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
 .exercise-main {
     display: flex;
     align-items: center;
@@ -180,6 +258,48 @@
     line-height: 1.2;
 }
 
+.exercise-name-edit {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #ffffff !important;
+    flex: 1;
+    padding: 0.2rem 0;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.exercise-name-edit:focus {
+    border-bottom-color: #3b82f6;
+    outline: none;
+    background: rgba(255, 255, 255, 0.05);
+    padding-left: 0.4rem;
+}
+
+.btn-remove-ex {
+    background: #450a0a;
+    border: 1px solid #7f1d1d;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    opacity: 0.4;
+}
+
+.btn-remove-ex:hover {
+    opacity: 1;
+    background: #7f1d1d;
+    transform: scale(1.1);
+}
+
 .exercise-stats {
     display: flex;
     margin-top: 0.25rem;
@@ -189,9 +309,15 @@
 /* Editable Grid Layout - Single Row */
 .editable-stats-grid {
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.stat-group {
+    display: flex;
     align-items: center;
     gap: 0.4rem;
-    width: 100%;
     flex-wrap: nowrap;
 }
 
@@ -225,6 +351,49 @@
     box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
 }
 
+.stat-input.rir {
+    width: 50px;
+}
+
+.input-label-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.mini-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #a0aec0;
+    text-transform: uppercase;
+}
+
+.second-edit-row {
+    margin-top: 10px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+}
+
+.rir-box {
+    flex-shrink: 0;
+}
+
+.exercise-notes-edit {
+    flex-grow: 1;
+}
+
+.stat-input.note-input {
+    width: 100%;
+    text-align: left;
+    padding-left: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    height: 36px;
+}
+
 .input-with-unit {
     display: flex;
     align-items: center;
@@ -254,6 +423,16 @@
     color: #ffffff !important;
     font-weight: 900;
     margin-left: 0.4rem;
+}
+
+.stat.rir-badge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.75rem;
 }
 
 .exercise-details {

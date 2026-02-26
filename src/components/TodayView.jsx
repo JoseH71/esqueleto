@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getActiveWeeklyPlan, updateWeeklyPlan, subscribeToWeeklyPlan, saveActiveWorkout, subscribeToActiveWorkout } from '../utils/weeklyPlanStorage';
 import { saveWorkout } from '../utils/firestoreStorage';
+import { getIntervalsCredentials, saveIntervalsCredentials, uploadToIntervals } from '../utils/intervalsService';
 import WeeklyPlanCard from './WeeklyPlanCard';
 import './TodayView.css';
 
@@ -13,6 +14,10 @@ export default function TodayView() {
     const [weeklyPlan, setWeeklyPlan] = useState(null);
     const [expandedDays, setExpandedDays] = useState({});
     const [savedMessage, setSavedMessage] = useState('');
+    const [isIntervalsLoading, setIsIntervalsLoading] = useState(false);
+    const [showIntervalsSettings, setShowIntervalsSettings] = useState(false);
+    const [intervalsAthleteId, setIntervalsAthleteId] = useState('');
+    const [intervalsApiKey, setIntervalsApiKey] = useState('');
 
     useEffect(() => {
         loadActiveWorkout();
@@ -166,13 +171,17 @@ export default function TodayView() {
         saveActiveWorkout(updatedWorkout);
 
         // Global Sync with Weekly Plan
+        syncWithWeeklyPlan(updatedWorkout);
+    };
+
+    const syncWithWeeklyPlan = async (updatedWorkout) => {
         if (updatedWorkout.planId && updatedWorkout.dayId) {
             try {
                 const currentPlan = await getActiveWeeklyPlan();
                 if (currentPlan && currentPlan.id === updatedWorkout.planId) {
                     const updatedDays = currentPlan.days.map(day => {
                         if (day.id === updatedWorkout.dayId) {
-                            return { ...day, exercises: updatedExercises };
+                            return { ...day, exercises: updatedWorkout.exercises };
                         }
                         return day;
                     });
@@ -184,6 +193,40 @@ export default function TodayView() {
                 console.error('Sync Error:', err);
             }
         }
+    };
+
+    const handleAddExercise = () => {
+        const newExercise = {
+            exercise: 'Nuevo Ejercicio',
+            sets: '',
+            reps: '',
+            load: '',
+            RIR: '',
+            notes: ''
+        };
+
+        const updatedWorkout = {
+            ...activeWorkout,
+            exercises: [...activeWorkout.exercises, newExercise]
+        };
+
+        setActiveWorkout(updatedWorkout);
+        saveActiveWorkout(updatedWorkout);
+        syncWithWeeklyPlan(updatedWorkout);
+    };
+
+    const handleRemoveExercise = (idx) => {
+        if (!confirm('¿Eliminar este ejercicio?')) return;
+
+        const updatedExercises = activeWorkout.exercises.filter((_, i) => i !== idx);
+        const updatedWorkout = {
+            ...activeWorkout,
+            exercises: updatedExercises
+        };
+
+        setActiveWorkout(updatedWorkout);
+        saveActiveWorkout(updatedWorkout);
+        syncWithWeeklyPlan(updatedWorkout);
     };
 
     const handleSaveToHistory = async () => {
@@ -200,6 +243,40 @@ export default function TodayView() {
             console.error('Error saving to history:', error);
             alert('Error al guardar: ' + error.message);
         }
+    };
+
+    const handleUploadToIntervals = async () => {
+        const { athleteId, apiKey } = getIntervalsCredentials();
+
+        if (!athleteId || !apiKey) {
+            setIntervalsAthleteId(athleteId || '');
+            setIntervalsApiKey(apiKey || '');
+            setShowIntervalsSettings(true);
+            return;
+        }
+
+        setIsIntervalsLoading(true);
+        try {
+            await uploadToIntervals(activeWorkout);
+            setSavedMessage('🚀 ¡Enviado a Intervals.icu!');
+            setTimeout(() => setSavedMessage(''), 3000);
+        } catch (error) {
+            console.error('Intervals Error:', error);
+            alert('Error al subir a Intervals: ' + error.message);
+        } finally {
+            setIsIntervalsLoading(false);
+        }
+    };
+
+    const handleSaveIntervalsSettings = () => {
+        if (!intervalsAthleteId || !intervalsApiKey) {
+            alert('Por favor, rellena ambos campos');
+            return;
+        }
+        saveIntervalsCredentials(intervalsAthleteId, intervalsApiKey);
+        setShowIntervalsSettings(false);
+        // After saving, try to upload
+        handleUploadToIntervals();
     };
 
     if (!activeWorkout) {
@@ -228,7 +305,7 @@ export default function TodayView() {
 
             <div className="today-header">
                 <div>
-                    <h1>💪 Hoy</h1>
+                    <h1>🏋️ Hoy</h1>
                     <h2 className="workout-title">{getWorkoutTitle(activeWorkout)}</h2>
                     {activeWorkout.date && (
                         <p className="workout-date">📅 {activeWorkout.date}</p>
@@ -241,6 +318,14 @@ export default function TodayView() {
                         title="Guardar en historial"
                     >
                         ✅ Entreno Completado
+                    </button>
+                    <button
+                        onClick={handleUploadToIntervals}
+                        className={`btn-intervals ${isIntervalsLoading ? 'loading' : ''}`}
+                        title="Subir a Intervals.icu"
+                        disabled={isIntervalsLoading}
+                    >
+                        {isIntervalsLoading ? '⌛' : '🚀 Intervals'}
                     </button>
                     <button
                         onClick={clearActiveWorkout}
@@ -293,42 +378,94 @@ export default function TodayView() {
                         <div key={idx} className="exercise-card">
                             <div className="exercise-header">
                                 <span className="exercise-number">{idx + 1}</span>
-                                <span className="exercise-name">{name}</span>
+                                <input
+                                    className="exercise-name-input"
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => handleStatChange(e, idx, ex.name ? 'name' : 'exercise', e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    placeholder="Nombre del ejercicio"
+                                />
+                                <button
+                                    className="btn-remove-exercise"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveExercise(idx);
+                                    }}
+                                    title="Eliminar ejercicio"
+                                >
+                                    🗑️
+                                </button>
                             </div>
 
                             <div className="editable-stats-grid">
                                 <div className="stat-group">
-                                    <input
-                                        className="stat-input"
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={ex.sets}
-                                        onChange={(e) => handleStatChange(e, idx, 'sets', e.target.value)}
-                                        placeholder="S"
-                                    />
-                                    <span className="stat-separator">×</span>
-                                    <input
-                                        className="stat-input"
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={ex.reps}
-                                        onChange={(e) => handleStatChange(e, idx, 'reps', e.target.value)}
-                                        placeholder="R"
-                                    />
-                                    <span className="stat-separator">@</span>
-                                    <div className="input-with-unit">
+                                    <div className="input-label-group">
+                                        <span className="mini-label">S</span>
                                         <input
-                                            className="stat-input load"
+                                            className="stat-input"
                                             type="text"
-                                            inputMode="decimal"
-                                            value={loadValue}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                handleStatChange(e, idx, 'load', val ? `${val} kg` : '')
-                                            }}
+                                            inputMode="numeric"
+                                            value={ex.sets}
+                                            onChange={(e) => handleStatChange(e, idx, 'sets', e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            placeholder="S"
+                                        />
+                                    </div>
+                                    <span className="stat-separator">*</span>
+                                    <div className="input-label-group">
+                                        <span className="mini-label">R</span>
+                                        <input
+                                            className="stat-input"
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={ex.reps}
+                                            onChange={(e) => handleStatChange(e, idx, 'reps', e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            placeholder="R"
+                                        />
+                                    </div>
+                                    <span className="stat-separator">*</span>
+                                    <div className="input-with-unit">
+                                        <div className="input-label-group">
+                                            <span className="mini-label">KG</span>
+                                            <input
+                                                className="stat-input load"
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={ex.load ? ex.load.replace(' kg', '').trim() : (ex.weight ? String(ex.weight).replace('kg', '').trim() : '')}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    handleStatChange(e, idx, 'load', val ? `${val} kg` : '')
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <span className="unit">kg</span>
+                                    </div>
+                                </div>
+                                <div className="second-edit-row">
+                                    <div className="input-label-group rir-box">
+                                        <span className="mini-label">RIR</span>
+                                        <input
+                                            className="stat-input rir"
+                                            type="text"
+                                            value={ex.RIR || ''}
+                                            onChange={(e) => handleStatChange(e, idx, 'RIR', e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
                                             placeholder="0"
                                         />
-                                        <span className="unit">kg</span>
+                                    </div>
+                                    <div className="exercise-notes-edit">
+                                        <input
+                                            className="stat-input note-input"
+                                            type="text"
+                                            value={ex.notes || ''}
+                                            onChange={(e) => handleStatChange(e, idx, 'notes', e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            placeholder="Notas..."
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -339,13 +476,6 @@ export default function TodayView() {
                                     <div className="detail-item">
                                         <span className="detail-label">⏱️ Tempo:</span>
                                         <span className="detail-value">{ex.tempo}</span>
-                                    </div>
-                                )}
-
-                                {ex.RIR && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">💯 RIR:</span>
-                                        <span className="detail-value">{ex.RIR}</span>
                                     </div>
                                 )}
 
@@ -374,12 +504,23 @@ export default function TodayView() {
                         </div>
                     );
                 })}
+
+                <button
+                    className="btn-add-exercise"
+                    onClick={handleAddExercise}
+                >
+                    ➕ Añadir Ejercicio
+                </button>
             </div>
 
             {/* Duration */}
             {activeWorkout.duration_minutes && (
                 <div className="workout-footer">
-                    ⏱️ Duración total: {activeWorkout.duration_minutes} min
+                    <div>⏱️ Duración total: {activeWorkout.duration_minutes} min</div>
+                    <div className="sync-indicator">
+                        <span className="sync-dot"></span>
+                        Sincronización en la nube activa
+                    </div>
                 </div>
             )}
 
@@ -399,6 +540,59 @@ export default function TodayView() {
                                 compact={true}
                             />
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Intervals Settings Modal */}
+            {showIntervalsSettings && (
+                <div className="intervals-settings-overlay">
+                    <div className="intervals-settings-modal">
+                        <h3>🔗 Conectar Intervals.icu</h3>
+                        <p>Introduce tus credenciales para sincronizar tus entrenamientos automáticamente.</p>
+
+                        <div className="settings-field">
+                            <label>Athlete ID</label>
+                            <input
+                                type="text"
+                                value={intervalsAthleteId}
+                                onChange={(e) => setIntervalsAthleteId(e.target.value)}
+                                placeholder="Ej: 123456"
+                            />
+                        </div>
+
+                        <div className="settings-field">
+                            <label>API Key</label>
+                            <input
+                                type="password"
+                                value={intervalsApiKey}
+                                onChange={(e) => setIntervalsApiKey(e.target.value)}
+                                placeholder="Tu API Key"
+                            />
+                        </div>
+
+                        <div className="settings-actions">
+                            <button
+                                className="btn-save-settings"
+                                onClick={handleSaveIntervalsSettings}
+                            >
+                                Guardar y Sincronizar
+                            </button>
+                            <button
+                                className="btn-cancel-settings"
+                                onClick={() => setShowIntervalsSettings(false)}
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+
+                        <div className="settings-help">
+                            <p>¿Dónde lo encuentro?</p>
+                            <ul>
+                                <li><strong>Athlete ID:</strong> Haz clic en tu nombre en Intervals.icu.</li>
+                                <li><strong>API Key:</strong> Pestaña "Settings", al final verás "API Keys".</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             )}

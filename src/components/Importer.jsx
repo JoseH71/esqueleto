@@ -15,11 +15,12 @@ export default function Importer({ onImport, onWeeklyPlanImport }) {
     const [isImporting, setIsImporting] = useState(false);
 
     const handleImport = async () => {
+        if (isImporting) return;
         setError('');
         setIsImporting(true);
 
         try {
-            // Check if it's a weekly plan
+            // Check if it's a weekly plan (text format)
             const isWeekly = inputFormat === 'weekly' ||
                 (inputFormat === 'auto' && isWeeklyPlan(input));
 
@@ -52,10 +53,93 @@ export default function Importer({ onImport, onWeeklyPlanImport }) {
                 // Parse as JSON
                 parsed = JSON.parse(input);
 
-                // Flexible validation: support both old and new formats
+                // Check if it's a week_plan JSON format (day_1, day_2, etc.)
+                if (parsed.week_plan) {
+                    const weeklyPlan = {
+                        title: 'Plan Semanal',
+                        days: []
+                    };
+
+                    // Day colors for visual variety
+                    const dayColors = ['green', 'blue', 'orange', 'purple', 'red'];
+                    const dayEmojis = ['🟢', '🔵', '🟠', '🟣', '🔴'];
+
+                    // Generate dates starting from today
+                    const getDateForDay = (offset) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() + offset);
+                        const d = date.getDate();
+                        const m = date.getMonth() + 1;
+                        const y = date.getFullYear();
+                        return `${d}-${m}-${y}`;
+                    };
+
+                    const getDayName = (offset) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() + offset);
+                        const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+                        return days[date.getDay()];
+                    };
+
+                    // Convert week_plan format to internal format
+                    const dayKeys = Object.keys(parsed.week_plan).sort();
+                    dayKeys.forEach((dayKey, idx) => {
+                        const dayData = parsed.week_plan[dayKey];
+
+                        // Convert exercises
+                        const exercises = (dayData.exercises || []).map((ex, exIdx) => ({
+                            id: String(exIdx + 1),
+                            name: ex.exercise || ex.name,
+                            sets: ex.sets,
+                            reps: String(ex.reps),
+                            load: ex.weight_kg !== undefined ? `${ex.weight_kg} kg` : '0 kg',
+                            rir: ex.rir
+                        }));
+
+                        // Build day object with all required fields
+                        const day = {
+                            id: String(idx + 1),
+                            title: dayData.name || `Día ${idx + 1}`,
+                            dayName: getDayName(idx),
+                            date: getDateForDay(idx),
+                            emoji: dayEmojis[idx % dayEmojis.length],
+                            color: dayColors[idx % dayColors.length],
+                            exercises
+                        };
+
+                        // Add warmup if present
+                        if (dayData.warmup) {
+                            day.warm_up = {
+                                exercise: dayData.warmup.exercise,
+                                duration_minutes: dayData.warmup.duration_min || dayData.warmup.duration_minutes
+                            };
+                        }
+
+                        // Add duration if present
+                        if (dayData.duration_min) {
+                            day.duration_minutes = dayData.duration_min;
+                        }
+
+                        weeklyPlan.days.push(day);
+                    });
+
+
+                    // Save to Firebase
+                    await saveWeeklyPlan(weeklyPlan);
+
+                    // Notify parent
+                    if (onWeeklyPlanImport) {
+                        onWeeklyPlanImport(weeklyPlan);
+                    }
+
+                    setInput('');
+                    return;
+                }
+
+                // Flexible validation: support both old and new formats (single day)
                 const hasTitle = parsed.title || parsed.session;
                 if (!hasTitle) {
-                    throw new Error('JSON debe tener "title" o "session"');
+                    throw new Error('JSON debe tener "title", "session" o "week_plan"');
                 }
 
                 if (!Array.isArray(parsed.exercises)) {
@@ -100,6 +184,7 @@ export default function Importer({ onImport, onWeeklyPlanImport }) {
         }
     };
 
+
     const handlePaste = async () => {
         try {
             const text = await navigator.clipboard.readText();
@@ -126,7 +211,7 @@ export default function Importer({ onImport, onWeeklyPlanImport }) {
  🚴 Bici reclinada → 10 min
 
 1️⃣ Prensa Matrix — GEMELO
-4 × 10 @ 10 kg
+4 * 10 * 10 kg
  RIR 2–3
 
 🔵 JUEVES 22-1 — UPPER ESTÉTICO
@@ -137,14 +222,14 @@ export default function Importer({ onImport, onWeeklyPlanImport }) {
  🚴 Bici reclinada → 10 min
 
 1️⃣ Prensa Matrix — GEMELO
-4 × 10 @ 10 kg
+4 * 10 * 10 kg
  Incremento: ninguno
  Tempo 2↑ · 0 · 4↓ · 2 s pausa abajo
  RIR 2–3
  Descanso 90–120 s
 
 2️⃣ Cuádriceps unilateral
-4 × 10 por pierna @ 9.5 kg
+4 * 10 por pierna * 9.5 kg
  Incremento: ninguno`;
     };
 

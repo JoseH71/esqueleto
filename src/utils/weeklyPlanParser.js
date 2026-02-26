@@ -67,9 +67,47 @@ export function parseWeeklyPlan(text) {
             continue;
         }
 
+        // ========== COMPACT FORMAT: 🏋️ DÍA X – TITLE ==========
+        const compactDayMatch = trimmedLine.match(/^🏋️\s*DÍA\s*(\d+)\s*[-–—]\s*(.+)/i);
+        if (compactDayMatch) {
+            // Save previous day if exists
+            if (currentDayMeta && currentDayText.length > 0) {
+                console.log('[Parser] Saving previous day:', currentDayMeta.title);
+                const parsedDay = parseDayFromText(currentDayMeta, currentDayText.join('\n'), weeklyPlan.year);
+                if (parsedDay) {
+                    weeklyPlan.days.push(parsedDay);
+                    console.log('[Parser] Day saved successfully. Total days:', weeklyPlan.days.length);
+                }
+            }
+
+            // Create date based on day number from today
+            const dayNum = parseInt(compactDayMatch[1]);
+            const today = new Date();
+            const dayDate = new Date(today);
+            dayDate.setDate(today.getDate() + dayNum - 1);
+            const dateStr = `${dayDate.getDate()}-${dayDate.getMonth() + 1}`;
+
+            // Assign colors based on day number
+            const colorEmojis = ['🟢', '🔵', '🟠', '🔴', '🟣'];
+            const emoji = colorEmojis[(dayNum - 1) % colorEmojis.length];
+
+            console.log('[Parser] Found compact day:', dayNum, '-', compactDayMatch[2]);
+            currentDayMeta = {
+                emoji: emoji,
+                dayName: `DÍA ${dayNum}`,
+                dateStr: dateStr,
+                title: compactDayMatch[2].trim(),
+                colorInfo: DAY_COLORS[emoji] || DAY_COLORS['🟢']
+            };
+            currentDayText = [trimmedLine];
+            collectingDescription = false;
+            collectingRules = false;
+            continue;
+        }
+
         // Detect day header (🟢 MARTES 20-1 — PIERNA + CORE)
         // Updated to support accented characters like SÁBADO
-        const dayMatch = trimmedLine.match(/^(🟢|🔵|🟠|🔴|🟣)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ]+)\s+(\d{1,2}[-\/\.]\d{1,2})\s*[—–-]\s*(.+)/);
+        const dayMatch = trimmedLine.match(/^(🟢|🔵|🟠|🔴|🟣)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ]+)\s+(\d{1,2}[-\/.]\d{1,2})\s*[—–-]\s*(.+)/);
         if (dayMatch) {
             // Save previous day if exists
             if (currentDayMeta && currentDayText.length > 0) {
@@ -166,6 +204,11 @@ export function parseWeeklyPlan(text) {
     weeklyPlan.description = descriptionLines.join('\n').trim();
     weeklyPlan.rules = rulesLines.join('\n').trim();
 
+    // If no week range was set, generate one
+    if (!weeklyPlan.weekRange && weeklyPlan.days.length > 0) {
+        weeklyPlan.weekRange = `Plan de ${weeklyPlan.days.length} días`;
+    }
+
     console.log('[Parser] Parsing complete. Total days:', weeklyPlan.days.length);
     console.log('[Parser] Days:', weeklyPlan.days.map(d => `${d.emoji} ${d.dayName} ${d.date}`).join(', '));
 
@@ -228,5 +271,9 @@ export function isWeeklyPlan(text) {
     // Check for multiple day markers or week header
     const hasWeekHeader = text.includes('📅') && text.toLowerCase().includes('semana');
     const dayEmojis = (text.match(/🟢|🔵|🟠|🔴|🟣/g) || []).length;
-    return hasWeekHeader || dayEmojis >= 2;
+
+    // Also check for compact format: multiple "🏋️ DÍA X" headers
+    const compactDayMarkers = (text.match(/🏋️\s*DÍA\s*\d+/gi) || []).length;
+
+    return hasWeekHeader || dayEmojis >= 2 || compactDayMarkers >= 2;
 }

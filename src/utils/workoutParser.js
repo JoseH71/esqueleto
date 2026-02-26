@@ -32,7 +32,7 @@ export function parseWorkoutText(text) {
 
             // Try to extract date from title (e.g., "LUNES 12-1 — PIERNA")
             // Patterns: "12-1", "12/1", "12.1"
-            const dateMatch = line.match(/(\d{1,2})[-\/.](\d{1,2})/);
+            const dateMatch = line.match(/(\d{1,2})[-\/.·](\d{1,2})/);
             if (dateMatch) {
                 const day = dateMatch[1].padStart(2, '0');
                 const month = dateMatch[2].padStart(2, '0');
@@ -42,14 +42,32 @@ export function parseWorkoutText(text) {
                 // Clean up session name by removing the date part and day name
                 // Remove patterns like "LUNES 12-1 —" or "MARTES 15/1 -"
                 workout.session = line
-                    .replace(/^(LUNES|MARTES|MIÉRCOLES|MIERCOLES|JUEVES|VIERNES|SÁBADO|SABADO|DOMINGO)\s+\d{1,2}[-\/\.]\d{1,2}\s*[-—–]\s*/i, '')
+                    .replace(/^(LUNES|MARTES|MIÉRCOLES|MIERCOLES|JUEVES|VIERNES|SÁBADO|SABADO|DOMINGO)\s+\d{1,2}[-\/\.·]\d{1,2}\s*[-—–]\s*/i, '')
                     .trim();
             }
+
+            // Clean up emoji prefixes like "🏋️ DÍA 2 – PIERNA + CORE" -> "PIERNA + CORE"
+            workout.session = workout.session
+                .replace(/^[🏋️💪🦵]+\s*/g, '')
+                .replace(/^DÍA\s*\d+\s*[-–—]\s*/i, '')
+                .trim();
+
             continue;
         }
 
-        // Parse warm-up section
+        // Parse warm-up section - multiple formats
         if (line.includes('🔥') || line.toLowerCase().includes('calentamiento')) {
+            // Format 1: "🔥 Calentamiento: 🚴 Bici reclinada · 10 min" (compact)
+            const compactWarmupMatch = line.match(/calentamiento[:\s]+(.+?)\s*[·]\s*(\d+)\s*min/i);
+            if (compactWarmupMatch) {
+                workout.warm_up = {
+                    exercise: compactWarmupMatch[1].replace(/^[🚴🏃‍♂️🚶]+\s*/, '').trim(),
+                    duration_minutes: parseInt(compactWarmupMatch[2])
+                };
+                continue;
+            }
+
+            // Format 2: Header then next line "Exercise → X min"
             const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
             if (nextLine) {
                 const warmupMatch = nextLine.match(/(.+?)\s*→\s*(\d+)\s*min/);
@@ -64,7 +82,7 @@ export function parseWorkoutText(text) {
             continue;
         }
 
-        // Parse duration
+        // Parse duration - multiple formats
         if (line.includes('⏱️') || line.toLowerCase().includes('duración total')) {
             const durationMatch = line.match(/(\d+)[-–]?(\d+)?\s*min/);
             if (durationMatch) {
@@ -72,6 +90,40 @@ export function parseWorkoutText(text) {
                     ? parseInt(durationMatch[2])
                     : parseInt(durationMatch[1]);
             }
+            continue;
+        }
+
+        // ========== NEW COMPACT FORMAT ==========
+        // Pattern: "Exercise Name: 4 × 10 × 20 kg · RIR 5"
+        // Also supports: "Exercise Name: 4 × 10 × 20 kg" (without RIR)
+        // And with ranges: "Exercise Name: 3 × 8–10 × 35 kg · RIR 2–3"
+        const compactExerciseMatch = line.match(/^([^:]+):\s*(\d+)\s*[×x*]\s*([\d–-]+)\s*[×x*]\s*([\d.,]+)\s*kg\s*(?:[·]\s*RIR\s*([\d–-]+))?/i);
+        if (compactExerciseMatch) {
+            // Save previous exercise if exists
+            if (currentExercise) {
+                workout.exercises.push(currentExercise);
+            }
+
+            exerciseOrder++;
+            // Handle reps - could be a number or a range like "8–10"
+            const repsValue = compactExerciseMatch[3];
+            const repsNum = repsValue.includes('–') || repsValue.includes('-')
+                ? repsValue.replace('–', '-')  // Store range as string with standard hyphen
+                : parseInt(repsValue);
+
+            currentExercise = {
+                id: exerciseOrder.toString(),
+                order: exerciseOrder,
+                name: compactExerciseMatch[1].trim(),
+                sets: parseInt(compactExerciseMatch[2]),
+                reps: repsNum,
+                load: `${compactExerciseMatch[4]} kg`,
+                tempo: '',
+                RIR: compactExerciseMatch[5] ? compactExerciseMatch[5].replace('–', '-') : '',
+                rest_seconds: '',
+                increment: '',
+                notes: []
+            };
             continue;
         }
 
@@ -152,9 +204,9 @@ export function parseWorkoutText(text) {
 
         // Parse exercise details (only if we have a current exercise)
         if (currentExercise) {
-            // Sets and reps: "4 × 10 @ 10 kg" or "4 × 10 por pierna @ 9.5 kg"
-            // This line typically starts with a number
-            const setsRepsMatch = line.match(/^(\d+)\s*[×x]\s*(\d+)(?:\s+[^@]*)?(?:\s*@\s*(.+))?/);
+            // Sets and reps: "4 × 10 @ 10 kg", "4 * 10 * 10 kg", "4 × 10 por pierna @ 9.5 kg"
+            // Support both @ and * as weight separators
+            const setsRepsMatch = line.match(/^(\d+)\s*[×x*]\s*(\d+)(?:\s+[^@*]*)?(?:\s*[@*]\s*(.+))?/);
             if (setsRepsMatch) {
                 currentExercise.sets = parseInt(setsRepsMatch[1]);
                 currentExercise.reps = parseInt(setsRepsMatch[2]);
