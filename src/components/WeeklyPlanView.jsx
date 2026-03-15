@@ -3,6 +3,7 @@ import {
     getActiveWeeklyPlan,
     getWeeklyPlans,
     deleteWeeklyPlan,
+    deleteAllWeeklyPlans,
     updateWeeklyPlan,
     subscribeToWeeklyPlan,
     saveActiveWorkout,
@@ -317,12 +318,28 @@ export default function WeeklyPlanView() {
         });
     };
 
-    const deletePlan = () => {
+    const deletePlan = async () => {
         if (confirm('¿Eliminar este plan semanal?')) {
+            if (weeklyPlan?.id) {
+                await deleteWeeklyPlan(weeklyPlan.id);
+            }
             localStorage.removeItem('activeWeeklyPlan');
             setWeeklyPlan(null);
             setExpandedDays({});
+            // Refresh plan list
+            const history = await getWeeklyPlans();
+            setAllPlans(sortPlans(history));
         }
+    };
+
+    const clearAllPlans = async () => {
+        if (!confirm('¿Eliminar TODOS los planes? Esta acción NO se puede deshacer.')) return;
+        if (!confirm('¿Estás seguro? Se borrarán todos los planes del historial.')) return;
+        const count = await deleteAllWeeklyPlans();
+        alert(`✅ ${count} plan(es) eliminado(s).`);
+        setWeeklyPlan(null);
+        setAllPlans([]);
+        setExpandedDays({});
     };
 
     const deletePlanFromHistory = async (e, planId) => {
@@ -394,9 +411,16 @@ export default function WeeklyPlanView() {
                     <button
                         className="btn-delete-plan"
                         onClick={deletePlan}
-                        title="Eliminar plan"
+                        title="Eliminar plan actual"
                     >
                         🗑️
+                    </button>
+                    <button
+                        className="btn-delete-plan btn-clear-all"
+                        onClick={clearAllPlans}
+                        title="Vaciar todos los planes"
+                    >
+                        🧹 Vaciar todo
                     </button>
                 </div>
             </header>

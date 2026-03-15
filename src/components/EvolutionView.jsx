@@ -37,6 +37,9 @@ export default function EvolutionView() {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedExercise, setSelectedExercise] = useState('');
     const [activeCategory, setActiveCategory] = useState('Todos');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [copySuccess, setCopySuccess] = useState(false);
 
     const CATEGORIES = ['Todos', 'Piernas', 'Pecho', 'Espalda', 'Hombros', 'Brazos', 'Core', 'Otros'];
 
@@ -168,6 +171,7 @@ export default function EvolutionView() {
                 if (dayVolume > 0 || dayMaxE1RM > 0) {
                     dataPoints.push({
                         date: dateLabel,
+                        dateISO: dateObj.toISOString().split('T')[0],
                         e1rm: Number(dayMaxE1RM.toFixed(1)),
                         volume: Number(dayVolume.toFixed(0)),
                         rawString: rawStrings.join(' | ')
@@ -178,6 +182,36 @@ export default function EvolutionView() {
 
         return dataPoints;
     }, [workouts, selectedExercise, aliases]);
+
+    // Derived filtered data for chart and table
+    const filteredChartData = useMemo(() => {
+        let data = [...chartData];
+        if (startDate) {
+            data = data.filter(d => d.dateISO >= startDate);
+        }
+        if (endDate) {
+            data = data.filter(d => d.dateISO <= endDate);
+        }
+        return data;
+    }, [chartData, startDate, endDate]);
+
+    const handleCopyTable = () => {
+        if (filteredChartData.length === 0) return;
+
+        let tableStr = `Evolución: ${selectedExercise}\n`;
+        tableStr += `Rango: ${startDate || 'Inicio'} hasta ${endDate || 'Hoy'}\n\n`;
+        tableStr += `Fecha | 1RM Est (kg) | Volumen (kg) | Detalle\n`;
+        tableStr += `------|--------------|--------------|--------\n`;
+
+        filteredChartData.forEach(d => {
+            tableStr += `${d.dateISO} | ${d.e1rm} | ${d.volume} | ${d.rawString}\n`;
+        });
+
+        navigator.clipboard.writeText(tableStr).then(() => {
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2000);
+        });
+    };
 
     if (isLoading) {
         return (
@@ -254,7 +288,7 @@ export default function EvolutionView() {
 
             <div className="evolution-controls">
                 <div className="control-group">
-                    <label>Selecciona un ejercicio del historial</label>
+                    <label>1. Selecciona un ejercicio</label>
                     <div className="select-wrapper">
                         <select
                             className="exercise-select"
@@ -289,73 +323,113 @@ export default function EvolutionView() {
                         </select>
                     </div>
                 </div>
+
+                <div className="control-group-row">
+                    <div className="input-field">
+                        <label>Desde:</label>
+                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    </div>
+                    <div className="input-field">
+                        <label>Hasta:</label>
+                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    </div>
+                </div>
             </div>
 
-            {selectedExercise && chartData.length > 0 ? (
-                <div className="chart-container">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                            data={chartData}
-                            margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
-                        >
-                            <CartesianGrid stroke="#334155" strokeDasharray="3 3" vertical={false} />
-                            <XAxis
-                                dataKey="date"
-                                stroke="#94a3b8"
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                tickMargin={15}
-                            />
-                            {/* Eje Y Izquierdo para el 1RM (Línea) */}
-                            <YAxis
-                                yAxisId="left"
-                                stroke="#667eea"
-                                tick={{ fill: '#667eea', fontSize: 12 }}
-                                domain={['auto', 'auto']}
-                                unit="kg"
-                            />
-                            {/* Eje Y Derecho para el Volumen (Barras, oculto o secundario) */}
-                            <YAxis
-                                yAxisId="right"
-                                orientation="right"
-                                stroke="#475569"
-                                tick={{ fill: '#475569', fontSize: 12 }}
-                                hide={false}
-                                domain={[0, 'auto']}
-                            />
+            {selectedExercise && filteredChartData.length > 0 ? (
+                <>
+                    <div className="chart-container">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart
+                                data={filteredChartData}
+                                margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+                            >
+                                <CartesianGrid stroke="#334155" strokeDasharray="3 3" vertical={false} />
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="#94a3b8"
+                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                    tickMargin={15}
+                                />
+                                <YAxis
+                                    yAxisId="left"
+                                    stroke="#667eea"
+                                    tick={{ fill: '#667eea', fontSize: 12 }}
+                                    domain={['auto', 'auto']}
+                                    unit="kg"
+                                />
+                                <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    stroke="#475569"
+                                    tick={{ fill: '#475569', fontSize: 12 }}
+                                    hide={false}
+                                    domain={[0, 'auto']}
+                                />
 
-                            <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={<CustomTooltip />} />
 
-                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
 
-                            {/* Volumen en Barras de fondo oscuro */}
-                            <Bar
-                                yAxisId="right"
-                                dataKey="volume"
-                                name="Volumen Total (kg)"
-                                fill="#334155"
-                                radius={[4, 4, 0, 0]}
-                                barSize={30}
-                            />
+                                <Bar
+                                    yAxisId="right"
+                                    dataKey="volume"
+                                    name="Volumen Total (kg)"
+                                    fill="#334155"
+                                    radius={[4, 4, 0, 0]}
+                                    barSize={30}
+                                />
 
-                            {/* 1RM en Línea brillante */}
-                            <Line
-                                yAxisId="left"
-                                type="monotone"
-                                dataKey="e1rm"
-                                name="1RM Estimado (Fuerza)"
-                                stroke="#667eea"
-                                strokeWidth={4}
-                                dot={{ fill: '#667eea', r: 5, strokeWidth: 2, stroke: '#0f172a' }}
-                                activeDot={{ r: 8, strokeWidth: 0 }}
-                            />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
+                                <Line
+                                    yAxisId="left"
+                                    type="monotone"
+                                    dataKey="e1rm"
+                                    name="1RM Estimado (Fuerza)"
+                                    stroke="#667eea"
+                                    strokeWidth={4}
+                                    dot={{ fill: '#667eea', r: 5, strokeWidth: 2, stroke: '#0f172a' }}
+                                    activeDot={{ r: 8, strokeWidth: 0 }}
+                                />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="evolution-table-section">
+                        <div className="table-header">
+                            <h3>📋 Tabla de Datos</h3>
+                            <button className={`btn-copy-table ${copySuccess ? 'success' : ''}`} onClick={handleCopyTable}>
+                                {copySuccess ? '✅ ¡Copiado!' : '📋 Copiar para IA'}
+                            </button>
+                        </div>
+                        <div className="table-responsive">
+                            <table className="evolution-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>1RM Est</th>
+                                        <th>Volumen</th>
+                                        <th>Detalles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[...filteredChartData].reverse().map((d, i) => (
+                                        <tr key={i}>
+                                            <td className="td-date">{d.dateISO}</td>
+                                            <td className="td-e1rm">{d.e1rm} kg</td>
+                                            <td className="td-volume">{d.volume} kg</td>
+                                            <td className="td-raw">{d.rawString}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
             ) : selectedExercise ? (
                 <div className="empty-state">
                     <div className="empty-icon">🤷</div>
-                    <p>No hay datos graficables para este ejercicio</p>
-                    <p className="empty-hint">Comprueba que el ejercicio tenga guardado el peso y las repeticiones.</p>
+                    <p>No hay datos graficables para este rango o ejercicio</p>
+                    <p className="empty-hint">Comprueba el filtro de fecha o que el ejercicio tenga peso y reps.</p>
                 </div>
             ) : null}
         </div>

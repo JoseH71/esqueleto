@@ -30,7 +30,7 @@ export default function HistoryView() {
     const [endDate, setEndDate] = useState('');
     const [copySuccess, setCopySuccess] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({ date: '', title: '', description: '' });
+    const [editForm, setEditForm] = useState({ date: '', title: '', description: '', exercises: [] });
     const [calendarMonth, setCalendarMonth] = useState(new Date());
 
     // Parse workout date to comparable format
@@ -229,6 +229,8 @@ export default function HistoryView() {
     const handleEditStart = (e, workout) => {
         e.stopPropagation();
         setEditingId(workout.id);
+        // Also expand it so exercises are visible
+        setExpandedWorkouts(prev => ({ ...prev, [workout.id]: true }));
 
         const dateObj = getWorkoutDateObj(workout);
         const y = dateObj.getFullYear();
@@ -236,10 +238,20 @@ export default function HistoryView() {
         const d = String(dateObj.getDate()).padStart(2, '0');
         const dateValue = `${y}-${m}-${d}`;
 
+        // Build editable exercises array
+        const editableExercises = (workout.exercises || []).map(ex => ({
+            name: ex.name || ex.exercise || '',
+            sets: ex.sets || '',
+            reps: ex.reps || '',
+            weight: ex.weight_kg !== undefined ? ex.weight_kg : (ex.weight || ex.load || ''),
+            rir: ex.RIR !== undefined ? ex.RIR : (ex.rir !== undefined ? ex.rir : ''),
+        }));
+
         setEditForm({
             date: dateValue,
             title: workout.title || workout.session || '',
-            description: workout.description || ''
+            description: workout.description || '',
+            exercises: editableExercises
         });
     };
 
@@ -251,14 +263,35 @@ export default function HistoryView() {
     const handleEditSave = async (e, workoutId) => {
         e.stopPropagation();
 
-        // Save exactly what the edit form has (YYYY-MM-DD from the input)
         let formattedDate = editForm.date;
+
+        // Rebuild exercises with proper field names
+        const exercises = editForm.exercises.map(ex => {
+            const weightStr = String(ex.weight).replace(',', '.');
+            const weightNum = parseFloat(weightStr) || 0;
+            const rirVal = ex.rir !== '' && ex.rir !== null && ex.rir !== undefined ? parseInt(ex.rir) : null;
+            const obj = {
+                name: ex.name,
+                exercise: ex.name,
+                sets: parseInt(ex.sets) || 0,
+                reps: String(ex.reps),
+                weight_kg: weightNum,
+                weight: weightNum,
+                load: `${weightNum} kg`,
+            };
+            if (rirVal !== null && !isNaN(rirVal)) {
+                obj.RIR = rirVal;
+                obj.rir = rirVal;
+            }
+            return obj;
+        });
 
         const updates = {
             date: formattedDate,
             title: editForm.title,
-            session: editForm.title, // Keep both for safety
-            description: editForm.description
+            session: editForm.title,
+            description: editForm.description,
+            exercises
         };
 
         const success = await updateWorkout(workoutId, updates);
@@ -268,6 +301,31 @@ export default function HistoryView() {
         } else {
             alert('Error al actualizar el entrenamiento');
         }
+    };
+
+    // Exercise editing helpers
+    const updateExerciseField = (index, field, value) => {
+        setEditForm(prev => {
+            const exercises = [...prev.exercises];
+            exercises[index] = { ...exercises[index], [field]: value };
+            return { ...prev, exercises };
+        });
+    };
+
+    const addExercise = (e) => {
+        e.stopPropagation();
+        setEditForm(prev => ({
+            ...prev,
+            exercises: [...prev.exercises, { name: '', sets: '3', reps: '10', weight: '0', rir: '' }]
+        }));
+    };
+
+    const removeExercise = (e, index) => {
+        e.stopPropagation();
+        setEditForm(prev => ({
+            ...prev,
+            exercises: prev.exercises.filter((_, i) => i !== index)
+        }));
     };
 
     const handleCopyRange = () => {
@@ -517,23 +575,77 @@ export default function HistoryView() {
                                     )}
 
                                     <div className="exercise-list">
-                                        {workout.exercises.map((ex, idx) => {
-                                            const name = ex.name || ex.exercise;
-                                            const load = ex.load ||
-                                                (ex.weight_kg !== undefined ? `${ex.weight_kg} kg` :
-                                                    (ex.weight ? `${ex.weight} kg` : '0 kg'));
-                                            return (
-                                                <div key={idx} className="exercise-item">
-                                                    <span className="exercise-name">{name}</span>
-                                                    <span className="exercise-details">
-                                                        {ex.sets} * {ex.reps} * {load}
-                                                        {(ex.RIR || ex.rir) !== undefined && (ex.RIR || ex.rir) !== '' && (
-                                                            <span className="exercise-rir"> (RIR {ex.RIR || ex.rir})</span>
-                                                        )}
-                                                    </span>
+                                        {editingId === workout.id ? (
+                                            <div className="exercise-edit-list" onClick={(e) => e.stopPropagation()}>
+                                                <div className="exercise-edit-header">
+                                                    <span>Ejercicio</span>
+                                                    <span>Series</span>
+                                                    <span>Reps</span>
+                                                    <span>Peso (kg)</span>
+                                                    <span>RIR</span>
+                                                    <span></span>
                                                 </div>
-                                            );
-                                        })}
+                                                {editForm.exercises.map((ex, idx) => (
+                                                    <div key={idx} className="exercise-edit-row">
+                                                        <input
+                                                            type="text"
+                                                            value={ex.name}
+                                                            onChange={(e) => updateExerciseField(idx, 'name', e.target.value)}
+                                                            className="edit-ex-name"
+                                                            placeholder="Ejercicio"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            value={ex.sets}
+                                                            onChange={(e) => updateExerciseField(idx, 'sets', e.target.value)}
+                                                            className="edit-ex-num"
+                                                            placeholder="3"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={ex.reps}
+                                                            onChange={(e) => updateExerciseField(idx, 'reps', e.target.value)}
+                                                            className="edit-ex-num"
+                                                            placeholder="10"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={ex.weight}
+                                                            onChange={(e) => updateExerciseField(idx, 'weight', e.target.value)}
+                                                            className="edit-ex-num"
+                                                            placeholder="0"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            value={ex.rir}
+                                                            onChange={(e) => updateExerciseField(idx, 'rir', e.target.value)}
+                                                            className="edit-ex-num"
+                                                            placeholder="-"
+                                                        />
+                                                        <button className="btn-remove-ex" onClick={(e) => removeExercise(e, idx)} title="Quitar">✕</button>
+                                                    </div>
+                                                ))}
+                                                <button className="btn-add-exercise" onClick={addExercise}>+ Añadir ejercicio</button>
+                                            </div>
+                                        ) : (
+                                            workout.exercises.map((ex, idx) => {
+                                                const name = ex.name || ex.exercise;
+                                                const load = ex.load ||
+                                                    (ex.weight_kg !== undefined ? `${ex.weight_kg} kg` :
+                                                        (ex.weight ? `${ex.weight} kg` : '0 kg'));
+                                                return (
+                                                    <div key={idx} className="exercise-item">
+                                                        <span className="exercise-name">{name}</span>
+                                                        <span className="exercise-details">
+                                                            {ex.sets} * {ex.reps} * {load}
+                                                            {(ex.RIR || ex.rir) !== undefined && (ex.RIR || ex.rir) !== '' && (
+                                                                <span className="exercise-rir"> (RIR {ex.RIR || ex.rir})</span>
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
                                     </div>
 
                                     {workout.duration_minutes && (

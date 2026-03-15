@@ -140,6 +140,25 @@ export const deleteWeeklyPlan = async (planId) => {
 };
 
 /**
+ * Delete ALL weekly plans from Firestore
+ */
+export const deleteAllWeeklyPlans = async () => {
+    try {
+        const plansRef = getWeeklyPlansCollection();
+        const snapshot = await getDocs(plansRef);
+        const promises = snapshot.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(promises);
+        localStorage.removeItem('activeWeeklyPlan');
+        localStorage.removeItem('activePlanId');
+        console.log('[WeeklyPlanStorage] All plans deleted:', snapshot.docs.length);
+        return snapshot.docs.length;
+    } catch (error) {
+        console.error('Error deleting all plans:', error);
+        return 0;
+    }
+};
+
+/**
  * Update an existing weekly plan
  * @param {Object} weeklyPlan - Updated weekly plan object
  */
